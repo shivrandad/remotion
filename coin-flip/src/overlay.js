@@ -31,8 +31,11 @@ export class TitleOverlay {
   /** @param p reveal progress 0..1; returns alpha for the compositor */
   draw(p) {
     p = Math.min(1, Math.max(0, p));
-    if (Math.abs(p - this.p) < 1e-4) return p;
-    this.p = p;
+    const alpha = 1 - Math.pow(1 - p, 3);
+    if (p <= 0) return 0;
+    if (this.p === 1) return alpha; // already drawn: the GPU animates the fade
+    this.p = 1;
+    p = 1;
     const { ctx, canvas } = this;
     const W = canvas.width;
     const H = canvas.height;
@@ -103,6 +106,6 @@ export class TitleOverlay {
       ctx.restore();
     }
     this.texture.needsUpdate = true;
-    return 1;
+    return alpha;
   }
 }

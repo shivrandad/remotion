@@ -47,7 +47,7 @@ export const BODIES = {
     light: { color: 0xfff1e0, intensity: 2.6 },
   },
   jupiter: {
-    id: 'jupiter', name: 'Jupiter', kind: 'gas', radius: 420, map: '8k_jupiter.jpg',
+    id: 'jupiter', name: 'Jupiter', kind: 'gas', radius: 260, map: '8k_jupiter.jpg',
     landing: { lat: -18, lon: 30, yaw: 0.0 }, spin: 0.004, bands: 0.0009,
     atmo: { color: [1.0, 0.86, 0.66], height: 2.5, strength: 0.7, haze: 0.18, hazeDist: 220, rim: 0.6 },
     detail: { albedo: 0.75, bump: 0 },
@@ -64,7 +64,7 @@ export const BODIES = {
     camera: { elevEnd: 0.27, aimEnd: 0.85 },
   },
   uranus: {
-    id: 'uranus', name: 'Uranus', kind: 'gas', radius: 360, map: '2k_uranus.jpg',
+    id: 'uranus', name: 'Uranus', kind: 'gas', radius: 130, map: '2k_uranus.jpg', rings: 'uranus',
     landing: { lat: 10, lon: 0, yaw: 0 }, spin: 0.004, bands: 0.0004,
     atmo: { color: [0.62, 0.9, 1.0], height: 2.5, strength: 0.75, haze: 0.22, hazeDist: 200, rim: 0.8 },
     detail: { albedo: 0.8, bump: 0 },
@@ -72,7 +72,7 @@ export const BODIES = {
     light: { color: 0xf2f6ff, intensity: 2.4 },
   },
   neptune: {
-    id: 'neptune', name: 'Neptune', kind: 'gas', radius: 350, map: '2k_neptune.jpg',
+    id: 'neptune', name: 'Neptune', kind: 'gas', radius: 160, map: '2k_neptune.jpg',
     landing: { lat: -20, lon: 60, yaw: 0 }, spin: 0.005, bands: 0.0007,
     atmo: { color: [0.36, 0.56, 1.0], height: 2.5, strength: 0.8, haze: 0.22, hazeDist: 200, rim: 0.8 },
     detail: { albedo: 0.5, bump: 0 },
@@ -175,6 +175,7 @@ float camDist() { return length(vWPos - cameraPosition); }
 // Close-range terrain detail the 8k map cannot provide at coin scale.
 float detailHeight() {
   float d = camDist();
+  if (d > 160.0) return 0.0;
   vec3 p = vPObj;
   float h = 0.0;
   h += 0.16 * fbm3(p * 0.45) * (1.0 - smoothstep(60.0, 160.0, d));
@@ -376,6 +377,41 @@ function sunMaterial(map, shared) {
         gl_FragColor = vec4(hot * 1.05 + vec3(0.14, 0.02, 0.0) * g2, 1.0);
       }`,
   });
+}
+
+// --- Uranus: thin, dark, nearly vertical rings arching low across the sky ----------
+function uranusRings(R, shared) {
+  const mat = new THREE.ShaderMaterial({
+    uniforms: { uR: { value: R }, uSunDir: shared.sunDir },
+    vertexShader: /* glsl */ `
+      varying vec2 vP;
+      void main() { vP = position.xy; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    fragmentShader: /* glsl */ `
+      uniform float uR; varying vec2 vP;
+      void main() {
+        float f = length(vP) / uR;
+        float a = 0.0;
+        // Narrow ringlets (6, 5, 4, alpha, beta, eta, gamma, delta) plus the bright epsilon ring.
+        float b[8] = float[8](1.64, 1.66, 1.68, 1.73, 1.76, 1.84, 1.86, 1.89);
+        for (int i = 0; i < 8; i++) a += exp(-pow((f - b[i]) / 0.0035, 2.0)) * 0.3;
+        a += exp(-pow((f - 1.98) / 0.012, 2.0)) * 0.5;
+        a += exp(-pow((f - 1.8) / 0.12, 2.0)) * 0.05; // faint dust sheet
+        if (a < 0.004) discard;
+        gl_FragColor = vec4(vec3(0.62, 0.7, 0.78) * 0.9, clamp(a, 0.0, 1.0));
+      }`,
+    transparent: true,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+  const m = new THREE.Mesh(new THREE.RingGeometry(R * 1.55, R * 2.08, 512, 1), mat);
+  // Ring plane contains the planet centre; tilted so the arc peaks ~3 degrees
+  // above the horizon straight ahead of the camera, under the title.
+  const beta = THREE.MathUtils.degToRad(27);
+  const n = new THREE.Vector3(0, Math.cos(beta), Math.sin(beta));
+  m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), n);
+  m.position.set(0, -R, 0);
+  m.renderOrder = 1;
+  return m;
 }
 
 // --- Earth's cloud layer (cleared over the landing site) ------------------------
@@ -648,6 +684,7 @@ export async function buildBody(def, renderer, shared) {
   const atmo = atmosphereMesh(def, R, shared);
   atmo.position.set(0, -R, 0);
   root.add(atmo);
+  if (def.rings === 'uranus') root.add(uranusRings(R, shared));
 
   const body = {
     def,
@@ -679,8 +716,8 @@ export async function buildBody(def, renderer, shared) {
     const sinkColor = groundColor.clone();
     body.flipUpdate = (t, plan) => {
       coinUniforms.uSinkY.value = root.position.y + 0.01;
-      coinUniforms.uSinkColor.value.copy(sinkColor).multiplyScalar(0.85);
-      coinUniforms.uSinkSoft.value = 0.1;
+      coinUniforms.uSinkColor.value.copy(sinkColor).multiplyScalar(0.5 * (def.light?.intensity ?? 2.4) / 2.4);
+      coinUniforms.uSinkSoft.value = 0.07;
     };
   }
   if (isSun) {

@@ -50,6 +50,7 @@ export class Pipeline {
           tHDR: { value: null },
           tText: { value: null },
           uTextAlpha: { value: 0 },
+          uTextOffset: { value: 0 },
           uTime: { value: 0 },
           uRes: { value: new THREE.Vector2(1, 1) },
           uVignette: { value: 0.32 },
@@ -59,7 +60,7 @@ export class Pipeline {
         vertexShader: quadVS,
         fragmentShader: /* glsl */ `
           uniform sampler2D tHDR; uniform sampler2D tText;
-          uniform float uTextAlpha; uniform float uTime; uniform vec2 uRes;
+          uniform float uTextAlpha; uniform float uTextOffset; uniform float uTime; uniform vec2 uRes;
           uniform float uVignette; uniform float uGrain; uniform float uFlash;
           varying vec2 vUv;
           float hash(vec2 p) { p = fract(p * vec2(443.897, 441.423)); p += dot(p, p.yx + 19.19); return fract((p.x + p.y) * p.x); }
@@ -86,7 +87,7 @@ export class Pipeline {
             vec2 vc = c * vec2(uRes.x / uRes.y, 1.0);
             o *= 1.0 - uVignette * smoothstep(0.35, 1.05, length(vc));
             // Title overlay (sRGB, premultiplied).
-            vec4 t = texture2D(tText, uv) * uTextAlpha;
+            vec4 t = texture2D(tText, uv + vec2(0.0, uTextOffset)) * uTextAlpha;
             o = t.rgb + o * (1.0 - t.a);
             // Film grain, luminance weighted so blacks stay clean.
             float g = hash(uv * uRes + fract(uTime * 7.31) * 100.0) - 0.5;

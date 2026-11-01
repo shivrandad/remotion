@@ -27,6 +27,8 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.autoClear = false;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
+// Shadow map is refreshed once per frame, not once per render() call (motion-blur samples).
+renderer.shadowMap.autoUpdate = false;
 document.body.appendChild(renderer.domElement);
 const canvas = renderer.domElement;
 
@@ -69,6 +71,7 @@ document.body.appendChild(recDot);
 
 // --- Sizing -----------------------------------------------------------------
 let forced = null; // [w, h] while recording
+let quality = 1; // dynamic resolution scale, lowered if the GPU falls behind
 function resize() {
   let bw, bh;
   if (forced) {
@@ -78,7 +81,7 @@ function resize() {
   } else {
     const w = window.innerWidth;
     const h = window.innerHeight;
-    const maxPix = 1920 * 1080 * 1.3;
+    const maxPix = 1920 * 1080 * 1.15 * quality * quality;
     const pr = Math.min(window.devicePixelRatio || 1, 2, Math.sqrt(maxPix / (w * h)));
     renderer.setPixelRatio(pr);
     renderer.setSize(w, h, false);
@@ -326,10 +329,32 @@ function evaluate(t) {
 
   // Title.
   const p = (t - plan.textStart) / 0.95;
-  pipeline.finalQuad.material.uniforms.uTextAlpha.value = overlay.draw(p);
+  const ta = overlay.draw(p);
+  pipeline.finalQuad.material.uniforms.uTextAlpha.value = ta;
+  pipeline.finalQuad.material.uniforms.uTextOffset.value = (1 - ta) * 0.012;
 }
 
 let last = performance.now();
+let last0 = last;
+// Dynamic resolution: if frames run long for a while, render fewer pixels.
+let slowFrames = 0;
+let fastFrames = 0;
+function adaptQuality(ms) {
+  if (forced || document.hidden || ms > 250) return;
+  if (ms > 19) slowFrames++;
+  else slowFrames = Math.max(0, slowFrames - 1);
+  if (ms < 13) fastFrames++;
+  else fastFrames = 0;
+  if (slowFrames > 20 && quality > 0.55) {
+    quality = Math.max(0.55, quality * 0.85);
+    slowFrames = 0;
+    resize();
+  } else if (fastFrames > 240 && quality < 1 && state !== 'flipping') {
+    quality = Math.min(1, quality / 0.85);
+    fastFrames = 0;
+    resize();
+  }
+}
 function frame(now) {
   requestAnimationFrame(frame);
   const dt = clamp((now - last) / 1000, 1 / 240, 1 / 24);
@@ -348,7 +373,7 @@ function frame(now) {
     const shutter = (frozenT !== null ? 1 / 60 : dt) * 0.5;
     const ang = plan.spin(t) * shutter;
     const lin = plan.linearSpeed(t) * shutter;
-    const samples = clamp(Math.ceil(Math.max(ang / 0.018, lin / 0.025)), 1, 32);
+    const samples = clamp(Math.ceil(Math.max(ang / 0.024, lin / 0.035)), 1, 20);
     if (samples > 1) {
       blur = {
         samples,
@@ -360,7 +385,10 @@ function frame(now) {
       };
     }
   }
+  renderer.shadowMap.needsUpdate = true;
   pipeline.render(scene, camera, coin.group, blur, dt, now / 1000);
+  adaptQuality(now - last0);
+  last0 = now;
 }
 
 resize();
