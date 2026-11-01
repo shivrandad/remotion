@@ -79,8 +79,11 @@ function resize() {
     renderer.setPixelRatio(1);
     renderer.setSize(bw, bh, false);
   } else {
-    const w = window.innerWidth;
-    const h = window.innerHeight;
+    // Measure the box the canvas actually occupies (inside an embed/iframe this
+    // can differ from window.innerWidth), so the frame is never cropped.
+    const r = canvas.getBoundingClientRect();
+    const w = Math.max(1, Math.round(r.width || window.innerWidth));
+    const h = Math.max(1, Math.round(r.height || window.innerHeight));
     const maxPix = 1920 * 1080 * 1.15 * quality * quality;
     const pr = Math.min(window.devicePixelRatio || 1, 2, Math.sqrt(maxPix / (w * h)));
     renderer.setPixelRatio(pr);
@@ -98,6 +101,15 @@ function resize() {
   camera.updateProjectionMatrix();
 }
 window.addEventListener('resize', resize);
+let lastBox = '';
+new ResizeObserver(() => {
+  const r = canvas.getBoundingClientRect();
+  const key = `${Math.round(r.width)}x${Math.round(r.height)}`;
+  if (key !== lastBox && !forced) {
+    lastBox = key;
+    resize();
+  }
+}).observe(canvas);
 
 // --- Assets -----------------------------------------------------------------
 async function loadStars() {

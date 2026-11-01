@@ -1,5 +1,5 @@
 html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
-canvas { display: block; width: 100vw; height: 100vh; object-fit: contain; background: #000; }
+canvas { position: fixed; inset: 0; display: block; width: 100%; height: 100%; object-fit: contain; background: #000; }
 body.flipping, body.flipping canvas { cursor: none; }
 .rec { position: fixed; top: 14px; right: 14px; width: 10px; height: 10px; border-radius: 50%; opacity: 0; transition: opacity .2s; pointer-events: none; }
 .rec.armed { opacity: .8; border: 2px solid #e33; width: 8px; height: 8px; }

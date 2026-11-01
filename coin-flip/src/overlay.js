@@ -49,7 +49,7 @@ export class TitleOverlay {
     const unit = Math.min(H, W * 0.5625);
 
     // Title: sized for the screen, then shrunk if it would not fit the width.
-    let size = Math.min(H * (portrait ? 0.075 : 0.125), W * (portrait ? 0.16 : 0.11));
+    let size = portrait ? Math.min(H * 0.075, W * 0.16) : Math.min(H * 0.115, W * 0.085);
     const track0 = 0.34 - 0.12 * e;
     ctx.save();
     ctx.font = `700 ${size}px Cinzel, Georgia, serif`;
