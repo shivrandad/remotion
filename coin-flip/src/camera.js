@@ -64,8 +64,8 @@ export function makeCameraRig(plan, def) {
   }
   const dist = curve(cam.dist || [[0, 9.6], [0.55, 9.2], [1.25, 7.8], [tI, 6.9], [tI + 3.5, 6.1]]);
   const yaw = curve(cam.yaw || [[0, -0.06], [1.25, 0.16], [tI, 0.26], [tI + 3.5, 0.34]]);
-  const elev = curve(cam.elev || [[0, 0.03], [0.6, 0.1], [1.3, 0.22], [tI, 0.36], [tI + 3.5, 0.38]]);
-  const aim = curve(cam.aim || [[0, 0.75], [1.0, 0.25], [tI, 0.55], [tI + 0.8, 0.95], [tI + 3.5, 1.1]]);
+  const elev = curve(cam.elev || [[0, 0.03], [0.6, 0.1], [1.3, 0.22], [tI, cam.elevEnd ?? 0.36], [tI + 3.5, (cam.elevEnd ?? 0.36) + 0.02]]);
+  const aim = curve(cam.aim || [[0, 0.75], [1.0, 0.25], [tI, 0.55], [tI + 0.8, (cam.aimEnd ?? 1.1) - 0.15], [tI + 3.5, cam.aimEnd ?? 1.1]]);
 
   return (t, outPos, outTarget) => {
     const i = Math.min(N - 1, Math.max(0, t / DT));

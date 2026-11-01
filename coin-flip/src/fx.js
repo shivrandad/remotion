@@ -96,19 +96,21 @@ export function createDust(maxPerBurst = 260) {
     uScale: { value: 800 },
     uDrag: { value: 2.4 },
     uGrav: { value: 0.9 },
+    uSize: { value: 1 },
+    uLife: { value: 1 },
   };
   const mat = new THREE.ShaderMaterial({
     uniforms,
     vertexShader: /* glsl */ `
       attribute vec3 aVel; attribute vec4 aMeta;
       uniform float uTime; uniform vec2 uBurstT; uniform vec2 uBurstS; uniform float uScale;
-      uniform float uDrag; uniform float uGrav;
+      uniform float uDrag; uniform float uGrav; uniform float uSize; uniform float uLife;
       varying float vAlpha; varying float vSeed; varying float vAge;
       void main() {
         float bt = aMeta.x < 0.5 ? uBurstT.x : uBurstT.y;
         float bs = aMeta.x < 0.5 ? uBurstS.x : uBurstS.y;
         float age = uTime - bt;
-        float life = aMeta.y;
+        float life = aMeta.y * uLife;
         vAge = age / life;
         vSeed = aMeta.w;
         // Only a fraction of the particles fire on weaker bursts.
@@ -118,9 +120,9 @@ export function createDust(maxPerBurst = 260) {
         p.y += -0.5 * uGrav * age * age * 0.15;
         p.y = max(p.y, 0.02);
         vec4 mv = modelViewMatrix * vec4(p, 1.0);
-        float size = aMeta.z * (1.0 + age * 1.8) * (0.6 + 0.4 * bs);
+        float size = aMeta.z * uSize * (1.0 + age * 1.8) * (0.6 + 0.4 * bs);
         gl_PointSize = act * size * uScale / -mv.z;
-        vAlpha = act * smoothstep(0.0, 0.06, age) * pow(1.0 - vAge, 1.6);
+        vAlpha = act * smoothstep(0.0, 0.06, age) * pow(clamp(1.0 - vAge, 0.0, 1.0), 1.6);
         gl_Position = projectionMatrix * mv;
       }`,
     fragmentShader: /* glsl */ `

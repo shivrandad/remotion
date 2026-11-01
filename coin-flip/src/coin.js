@@ -136,13 +136,13 @@ export function createCoin(renderer) {
       if (k <= 0) c.setRGB(0, 0, 0);
       else {
         const r = Math.min(1, k * 1.6);
-        const g = Math.max(0, Math.min(1, (k - 0.35) * 1.4)) * 0.55;
-        const b = Math.max(0, (k - 0.8) * 1.5) * 0.25;
+        const g = Math.max(0, Math.min(1, (k - 0.4) * 1.2)) * 0.32;
+        const b = 0;
         c.setRGB(r, g, b);
       }
       for (const m of materials) {
         m.emissive.copy(c);
-        m.emissiveIntensity = 2.2 * k;
+        m.emissiveIntensity = 1.1 * k;
         m.roughness = 1;
       }
     },

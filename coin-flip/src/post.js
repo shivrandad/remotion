@@ -33,6 +33,10 @@ export class Pipeline {
           void main() {
             vec4 s = texture2D(tScene, vUv);
             vec4 c = texture2D(tCoin, vUv) * uCoin; // premultiplied
+            // Never let a stray NaN/Inf pixel reach bloom (it would flood the frame).
+            if (any(isnan(s)) || any(isinf(s))) s = vec4(0.0);
+            if (any(isnan(c)) || any(isinf(c))) c = vec4(0.0);
+            s.rgb = min(s.rgb, vec3(64.0));
             gl_FragColor = vec4(c.rgb + s.rgb * (1.0 - c.a), 1.0);
           }`,
         depthTest: false,

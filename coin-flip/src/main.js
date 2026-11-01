@@ -4,7 +4,7 @@ import '@fontsource/cinzel/900.css';
 import '@fontsource/montserrat/500.css';
 import './style.css';
 
-import { createCoin, COIN_R, COIN_HALF } from './coin.js';
+import { createCoin, COIN_R, COIN_HALF, coinUniforms } from './coin.js';
 import { CoinEnvironment } from './env.js';
 import { BODIES, BODY_IDS, buildBody } from './bodies.js';
 import { createContactShadow, createDust } from './fx.js';
@@ -36,6 +36,7 @@ const camera = new THREE.PerspectiveCamera(40, 16 / 9, 0.05, 3000);
 const shared = {
   center: { value: new THREE.Vector3(0, -1000, 0) },
   sunDir: { value: new THREE.Vector3(-0.55, 0.62, 0.56).normalize() },
+  time: { value: 0 },
 };
 
 const sun = new THREE.DirectionalLight(0xfff1e0, 2.6);
@@ -88,6 +89,9 @@ function resize() {
   pipeline.setSize(size.x, size.y);
   overlay.setSize(size.x, size.y);
   camera.aspect = size.x / size.y;
+  // Keep at least ~50 degrees of horizontal view on tall/portrait screens.
+  const minH = THREE.MathUtils.degToRad(50);
+  camera.fov = Math.max(40, THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(minH / 2) / camera.aspect)));
   camera.updateProjectionMatrix();
 }
 window.addEventListener('resize', resize);
@@ -150,6 +154,31 @@ function evictExcept(keep) {
   }
 }
 
+function applyBodyLook(body) {
+  const def = body.def;
+  const cloud = def.surface?.type === 'cloud';
+  shadow.uniforms.uR.value = body.flatGround ? 1e6 : body.R;
+  shadow.mesh.scale.setScalar(body.flatGround ? 0.45 : 1);
+  shadow.uniforms.uStrength.value = def.kind === 'sun' ? 0.55 : 0.85;
+  sun.color.set(def.light?.color ?? 0xfff1e0);
+  sun.intensity = def.light?.intensity ?? 2.6;
+  hemi.groundColor.set(def.kind === 'sun' ? 0xff7a20 : 0x1a1008);
+  hemi.intensity = def.kind === 'sun' ? 0.9 : 0.18;
+  coin.setHeat(0);
+  renderer.toneMappingExposure = def.exposure ?? 1.0;
+  coinUniforms.uSinkY.value = -100;
+  // Impact particles: dust, ice glitter, cloud splash or solar plasma.
+  const du = dust.uniforms;
+  du.uColor.value.copy(body.dustColor);
+  du.uDrag.value = def.dustDrag ?? 2.4;
+  du.uGrav.value = def.dustGrav ?? 0.9;
+  du.uSize.value = cloud ? 1.3 : def.ice ? 0.6 : 1;
+  du.uLife.value = cloud ? 0.9 : 1;
+  if (cloud) du.uColor.value.copy(body.groundColor).multiplyScalar(1.1);
+  dust.points.material.blending = def.plasma ? THREE.AdditiveBlending : THREE.NormalBlending;
+  dust.points.material.needsUpdate = true;
+}
+
 // --- Flip state --------------------------------------------------------------
 let state = 'idle';
 let plan = null;
@@ -172,9 +201,7 @@ async function flip(opts = {}) {
     setCoinEnv(coinEnv.update(body));
   }
   const def = body.def;
-  shadow.uniforms.uR.value = body.R;
-  shadow.mesh.visible = def.kind !== 'cloud';
-  dust.uniforms.uColor.value.copy(body.dustColor);
+  applyBodyLook(body);
 
   plan = makePlan(result, def.surface || { type: 'solid' }, [rand01(), rand01(), rand01()]);
   rig = makeCameraRig(plan, def);
@@ -283,11 +310,12 @@ function evaluate(t) {
   shadow.uniforms.uLow.value = Math.max(0, low - Math.min(0, current.root.position.y));
   shadow.uniforms.uOffset.value.set(-shared.sunDir.value.x, -shared.sunDir.value.z).multiplyScalar(0.45);
   shadow.mesh.position.y = current.root.position.y;
-  shadow.mesh.visible = def.kind !== 'cloud' && t > 1.2;
+  shadow.mesh.visible = def.surface?.type !== 'cloud' && t > 1.2;
+  shared.time.value = t + 40;
 
   // Dust.
   dust.uniforms.uTime.value = t;
-  if (def.dust) {
+  if (def.dust || def.splash) {
     dust.uniforms.uBurstT.value.set(plan.tImp, plan.tBounceLand);
     dust.uniforms.uBurstS.value.set(1, 0.45);
   } else dust.uniforms.uBurstT.value.set(1e3, 1e3);

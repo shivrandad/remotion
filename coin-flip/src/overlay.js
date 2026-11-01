@@ -42,13 +42,19 @@ export class TitleOverlay {
       return 0;
     }
     const e = 1 - Math.pow(1 - p, 3);
-    const unit = Math.min(H, W * 0.5625); // keep proportions on non-16:9 windows
+    const portrait = H > W;
+    const unit = Math.min(H, W * 0.5625);
 
-    // Title: tracking settles in as it fades up.
-    const size = unit * 0.125;
-    const track = size * (0.34 - 0.12 * e);
-    const y = H * 0.135 + unit * 0.03 + (1 - e) * unit * 0.012;
+    // Title: sized for the screen, then shrunk if it would not fit the width.
+    let size = Math.min(H * (portrait ? 0.075 : 0.125), W * (portrait ? 0.16 : 0.11));
+    const track0 = 0.34 - 0.12 * e;
     ctx.save();
+    ctx.font = `700 ${size}px Cinzel, Georgia, serif`;
+    ctx.letterSpacing = '0px';
+    const raw = ctx.measureText(this.title).width + this.title.length * size * 0.34;
+    if (raw > W * 0.86) size *= (W * 0.86) / raw;
+    const track = size * track0;
+    const y = H * (portrait ? 0.1 : 0.135) + size * 0.24 + (1 - e) * unit * 0.012;
     ctx.font = `700 ${size}px Cinzel, Georgia, serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -77,9 +83,14 @@ export class TitleOverlay {
     const p2 = Math.min(1, Math.max(0, (p - 0.25) / 0.75));
     if (p2 > 0) {
       const e2 = 1 - Math.pow(1 - p2, 3);
-      const s2 = unit * 0.03;
-      const t2 = s2 * 0.5;
+      let s2 = Math.max(12, size * 0.24);
+      const sub = this.sub.toUpperCase();
       ctx.save();
+      ctx.font = `500 ${s2}px Montserrat, Helvetica, Arial, sans-serif`;
+      ctx.letterSpacing = '0px';
+      const w2 = ctx.measureText(sub).width + sub.length * s2 * 0.5;
+      if (w2 > W * 0.9) s2 *= (W * 0.9) / w2;
+      const t2 = s2 * 0.5;
       ctx.font = `500 ${s2}px Montserrat, Helvetica, Arial, sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -88,7 +99,7 @@ export class TitleOverlay {
       ctx.shadowColor = 'rgba(0,0,0,0.8)';
       ctx.shadowBlur = s2 * 0.6;
       ctx.fillStyle = '#f3ece0';
-      ctx.fillText(this.sub.toUpperCase(), W / 2 + t2 / 2, y + size * 0.72 + (1 - e2) * unit * 0.008);
+      ctx.fillText(sub, W / 2 + t2 / 2, y + size * 0.72 + (1 - e2) * unit * 0.008);
       ctx.restore();
     }
     this.texture.needsUpdate = true;
